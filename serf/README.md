@@ -32,8 +32,8 @@ Check
 
 * on VM host OS
 
-    - http://<VM_IP_ADDRESS>/
-    - http://<VM_IP_ADDRESS>:9999/
+    - http://VM_IP_ADDRESS/
+    - http://VM_IP_ADDRESS:9999/
 
 * on docker host
 
