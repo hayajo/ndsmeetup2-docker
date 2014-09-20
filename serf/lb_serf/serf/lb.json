@@ -1,0 +1,9 @@
+{
+  "tags": {
+    "role": "lb"
+  },
+  "node_name": "lb",
+  "event_handlers": [
+    "perl /etc/serf/handler.pl"
+  ]
+}

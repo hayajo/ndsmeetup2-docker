@@ -1,0 +1,384 @@
+はじめてのDocker
+NDS in Niigata #2
+20 Sep 2014
+
+@hayajo
+
+* Basics
+
+* What is Docker(1/4)
+
+アプリケーションの開発・配布・実行のためのオープンプラットフォーム
+
+.link https://www.docker.com/whatisdocker/
+
+* What is Docker(2/4)
+
+下記のリソースを隔離したユーザー空間（コンテナ）を作成し、その中でプロセスを実行する
+
+- ファイルシステム
+# mntns
+- ネットワーク
+# netns
+- プロセステーブル
+# pidns
+- ユーザー権限
+# capability, selinux
+- CPU・メモリ
+# cgroup
+
+Linuxカーネルの機能で実現
+
+コンテナにOSは含まない（!= 仮想マシン）
+
+* What is Docker(3/4)
+
+Dockerでパッケージングされたアプリケーションは他のDocker環境上でも実行が可能
+
+Docker Hub Registry
+
+.link https://registry.hub.docker.com/
+
+* What is Docker(4/4)
+
+他のOSではBSDのJailsやSolarisのZoneなどがある
+
+Jails
+
+.link http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/jails.html
+
+Zone
+
+.link http://www.oracle.com/technetwork/server-storage/solaris/containers-169727.html
+
+
+* Install
+
+* Installation on CentOS
+
+  $ sudo yum install -y \
+    http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+  $ sudo yum install -y docker-io
+
+* Installation on Ubuntu
+
+  $ sudo apt-get install docker.io
+  $ sudo ln -s /usr/bin/docker.io /usr/local/bin/docker
+
+* Installation on Mac/Windows (1/2)
+
+boot2docker
+
+.link http://boot2docker.io/
+
+docker環境構築済みのディスクイメージ ＋ VirtualBox操作スクリプト
+
+dockerの[[http://docs.docker.com/reference/api/docker_remote_api/][Remote API]]利用し、Mac/Windowsのdockerコマンドから透過的にVirtualBox上のdocker環境を操作可能
+
+* Installation on Mac/Windows (2/2)
+
+Vagrant
+
+.link https://www.vagrantup.com/
+
+  $ mkdir ~/vagrant-docker && cd !$
+  $ cat <<EOF > Vagrantfile
+  Vagrant.configure(2) do |config|
+    config.vm.box = "chef/centos-6.5"
+    config.vm.network "private_network", ip: "192.168.33.10"
+    config.vm.provision :docker do |d|
+    end
+  end
+  EOF
+  $ vagrant up
+
+Vagrantのdocker provisionerを利用して環境構築
+
+boot2dockerに比べ、ホストとのファイル共有などの設定が容易
+
+* Basic Usage
+
+* Pull a base image from Docker Hub
+
+docker pull
+
+  $ docker pull centos
+  Pulling repository centos
+  70214e5d0a90: Download complete
+  ...
+
+* Show all images
+
+docker images
+
+  $ docker images
+  REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+  centos              centos5             5a1ebaa356ff        7 days ago          484 MB
+  centos              centos7             70214e5d0a90        11 days ago         224 MB
+  centos              latest              70214e5d0a90        11 days ago         224 MB
+  centos              centos6             68eb857ffb51        11 days ago         212.7 MB
+
+* Create a container and start it
+
+docker run
+
+  $ docker run centos cat /etc/hostname
+  $ docker run -it centos /bin/bash
+  $ docker run --name clock -d centos /bin/sh -c 'while [ 1 ]; do date | tee -a date.log; wc -l date.log; sleep 1; done'
+
+* Show (running|all) containers
+
+docker ps
+
+- 起動中のコンテナを表示
+
+  $ docker ps
+  CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS               NAMES
+  b1977bef62d2        centos:centos7      "/bin/sh -c 'while [   2 seconds ago       Up 2 seconds                            clock
+
+- 停止したコンテナを含む、すべてのコンテナを表示
+
+  $ docker ps -a
+  CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS                     PORTS               NAMES
+  b1977bef62d2        centos:centos7      "/bin/sh -c 'while [   2 minutes ago       Up 2 minutes                                   clock
+  6846d197f55b        centos:centos7      "/bin/bash"            3 minutes ago       Exited (0) 3 minutes ago                       hungry_darwin
+  032bd20a92e5        centos:centos7      "cat /etc/hostname"    4 minutes ago       Exited (0) 4 minutes ago                       loving_einstein
+
+* Stop a running container
+
+docker stop
+
+  $ docker stop clock
+
+実行したコマンドにSIGTERMを送信し、プロセス停止後、他のプロセスにはSIGKILLを送信する
+
+* Restart a stopped container
+
+docker start
+
+  $ docker start clock
+
+コンテナのコマンドを再度実行
+
+ファイルシステムの状態はコンテナの停止時のまま
+
+* Creating own images
+
+* Dockerfile
+
+Dockerfileにイメージ構築手順を記述する
+
+  $ cat <<EOF > Dockerfile
+  FROM centos:centos6
+  RUN yum install -y httpd
+  COPY index.html /var/www/html/
+  EXPOSE 80
+  CMD ["/usr/sbin/httpd", "-D", "FOREGROUND"]
+  EOF
+
+* Instructions in Dockerfile
+
+FROM
+ベースイメージを指定する
+
+RUN
+指定されたコマンドを実行する
+
+COPY
+# ADD
+指定したファイルをコンテナにコピーする
+
+EXPOSE
+コンテナが公開するポート番号を記述する。dockerのLink機能で利用される
+
+CMD
+# ENTRYPOINT
+コンテナで実行するコマンドを指定する。実行オプションが違うだけのコンテナを作成する場合は[[http://docs.docker.com/reference/builder/#entrypoint][ENTRYPOINT]]と組み合わせて使用すると良い
+
+* More instructions
+
+その他INSTRUCTIONはリファレンスを参照
+
+.link http://docs.docker.com/reference/builder/
+
+
+* Build a new image
+
+docker build
+
+  $ docker build -t ndsmeetup2/httpd .
+
+リポジトリ名は username/imagename[:tag] で指定するのが一般的
+
+  $ docker images ndsmeetup2/httpd
+  REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+  ndsmeetup2/httpd     latest              8c965e344d25        2 hours ago         305.3 MB
+
+:tagを省略した場合はlatestとなる
+
+* Show the layer stack of an image
+
+docker history
+
+  $ docker history ndsmeetup2/httpd
+  IMAGE               CREATED             CREATED BY                                      SIZE
+  8c965e344d25        47 minutes ago      /bin/sh -c #(nop) CMD [/usr/sbin/httpd -D FOR   0 B
+  6614f1ae6274        47 minutes ago      /bin/sh -c #(nop) EXPOSE map[80/tcp:{}]         0 B
+  7a3d262b119a        47 minutes ago      /bin/sh -c #(nop) COPY file:5ac7fc5c05638e586   130 B
+  1b35c4d721a4        47 minutes ago      /bin/sh -c yum install -y httpd                 92.64 MB
+  68eb857ffb51        13 days ago         /bin/sh -c #(nop) ADD file:9be0e96ac5792a45d4   212.7 MB
+  34e94e67e63a        3 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
+  511136ea3c5a        15 months ago                                                       0 B
+
+* Advanced Usage
+
+* Run more than one process in a container
+
+* Using Supervisor
+
+Using Supervisor - Docker Documentation
+
+.link http://docs.docker.com/articles/using_supervisord/
+
+* Using Monit
+
+Dockerfile の書き方「私的」なベストプラクティス（3）〜サービスの起動について〜 - ようへいの日々精進 XP
+
+.link http://inokara.hateblo.jp/entry/2013/12/29/215322
+
+* Using Bash(1/3)
+
+Dockerfile
+
+  From centos:centos6
+
+  RUN rpm -ivh http://ftp.riken.jp/Linux/fedora/epel/6/x86_64/epel-release-6-8.noarch.rpm
+  RUN yum install -y httpd munin munin-node
+  RUN sed -i 's/^\(session\s\+required\s\+pam_loginuid.so\)$/#\1/' /etc/pam.d/crond
+  ADD munin.conf /etc/httpd/conf.d/munin.conf
+
+  COPY start.sh /usr/local/bin/start
+  RUN chmod +x /usr/local/bin/start
+  COPY stop.sh /usr/local/bin/stop
+  RUN chmod +x /usr/local/bin/stop
+
+  CMD ["/usr/local/bin/start"]
+
+* Using Bash(2/3)
+
+start.sh
+
+  #!/bin/bash
+
+  service rsyslog start
+  service crond start
+  service httpd start
+  service munin-node start
+
+  cat <<EOF >~/.bashrc
+  trap '/usr/local/bin/stop; exit 0' TERM
+  EOF
+
+  exec /bin/bash
+
+* Using Bash(3/3)
+
+stop.sh
+
+  #!/bin/bash
+
+  service munin-node stop
+  service httpd stop
+  service crond stop
+  service rsyslog stop
+
+* Managing Data
+
+* Data Volume
+
+-v /container で他のコンテナとデータを共有するためのボリュームを指定する
+
+  $ docker run -d --name httpd -v /var/www -v /var/log/httpd ndsmeetup2/httpd
+  $ docker inspect -f '{{.Volumes}}' httpd
+  map[/var/log/httpd:/var/lib/docker/vfs/dir/... /var/www:/var/lib/docker/vfs/dir/...]
+
+DockerfileではVOLUMEで指定する
+
+  VOLUME ["/var/www", "/var/log/httpd"]
+
+# 指定する「だけ」。が、指定せずにあとから設定は無理。
+
+* Mount Host (File|Directory) as a Data Volume
+
+-v /host:/container[:rw|ro] でホストのファイルやディレクトリを新しいコンテナにマウントし、ボリュームとして指定する
+
+  $ cat /etc/hostname > index.html
+  $ docker run -d --name httpd_hostdir -v `pwd`:/var/www/html ndsmeetup2/httpd
+  $ docker inspect -f '{{.Volumes}}' httpd_hostdir
+  map[/var/www/html:/path_to_pwd]
+  $ curl `docker inspect -f '{{.NetworkSettings.IPAddress}}' httpd_hostdir`
+  YOUR_HOSTNAME
+
+ホストとコンテナ間でファイル共有をする場合に使用する
+
+* Data Volume Container
+
+--volumes-from を指定して、他のコンテナのボリュームを新しいコンテナにマウントする
+
+  $ mkdir backup
+  $ docker run --volumes-from httpd -v `pwd`/backup:/backup ubuntu \
+    tar vczf /backup/backup.tar.gz /var/www /var/log/httpd
+  $ ls -l backup
+  backup.tar.gz
+
+# centosではtarやgzipがデフォルトで入っていないのでubuntuを使用
+
+コンテナ間でファイル共有をする場合に使用する
+
+* Networking
+
+* Using a new network stack
+
+デフォルトのブリッジネットワークモードの場合はポートフォワードを設定しなければならない
+
+  $ docker run -d -p 80:80 ndsmeetup2/httpd
+  $ curl localhost
+  <!DOCTYPE html>
+  <title>#ndsmeetup2</title>
+  Hello Docker
+
+* Using host network stack
+
+--net=host でホストのネットワークスタックを使用可能
+
+  $ docker run -d --net=host ndsmeetup2/httpd
+  $ curl localhost
+  <!DOCTYPE html>
+  <title>#ndsmeetup2</title>
+  Hello Docker
+
+* Using another container network stack
+
+--net=container:<name|id> で他のコンテナのネットワークスタックを使用可能
+
+  $ docker run -d --name net_base ndsmeetup2/httpd
+  $ docker run -it --net=container:net_base centos /bin/bash
+  docker> curl localhost
+  <!DOCTYPE html>
+  <title>#ndsmeetup2</title>
+  Hello Docker
+
+* Connecting directly into a docker container from the host OS of VM
+
+boot2dockerやVagrantなどの仮想環境では、ホスト(Mac/Windows)OSのルーティングを設定して直接コンテナにアクセスできるようにすると便利
+
+- Mac
+
+  $ sudo route add -p 172.17.0.0/16 VM_IP_ADDR
+
+- Windows
+
+  > route -p add 172.17.0.0 mask 255.255.0.0 VM_IP_ADDR
+
+boot2dockerやVagrantのdocker provisionerで構築（パッケージからインストール）した場合、仮想マシンのNATは設定済み。うまくいかない場合は仮想マシンのiptablesを確認する
+
