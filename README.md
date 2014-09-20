@@ -12,7 +12,7 @@ Usage
 
 * on VM host OS
 
-    Access to http://<VM_IP_ADDRESS>:3999/docker.slide
+    Access to http://VM_IP_ADDRESS:3999/docker.slide
 
 * on docker host
 
