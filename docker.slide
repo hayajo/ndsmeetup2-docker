@@ -39,6 +39,10 @@ Docker Hub Registry
 
 .link https://registry.hub.docker.com/
 
+Official Language Stack
+
+.link https://registry.hub.docker.com/repos/stackbrew/?s=stars
+
 * What is Docker(4/4)
 
 他のOSではBSDのJailsやSolarisのZoneなどがある
@@ -71,9 +75,11 @@ boot2docker
 
 .link http://boot2docker.io/
 
-docker環境構築済みのディスクイメージ ＋ VirtualBox操作スクリプト
+docker環境構築済みのディスクイメージ ＋ VirtualBox wrapper
 
 dockerの[[http://docs.docker.com/reference/api/docker_remote_api/][Remote API]]利用し、Mac/Windowsのdockerコマンドから透過的にVirtualBox上のdocker環境を操作可能
+
+Windowsでは未検証なのです...
 
 * Installation on Mac/Windows (2/2)
 
@@ -81,20 +87,33 @@ Vagrant
 
 .link https://www.vagrantup.com/
 
-  $ mkdir ~/vagrant-docker && cd !$
-  $ cat <<EOF > Vagrantfile
+
+Vagrantのshell provisionerを利用して環境構築（stable版を利用）
+
+  $ mkdir ~/vagrant-docker-stable && cd !$
+  $ cat <<EOF >Vagrantfile
   Vagrant.configure(2) do |config|
-    config.vm.box = "chef/centos-6.5"
+    config.vm.box = "ubuntu/trusty64"
+    config.vm.network "private_network", ip: "192.168.33.10"
+    config.vm.provision :shell, inline: <<-"EOF"
+      curl -sSL https://get.docker.com/ubuntu/ | sudo sh
+    EOF
+  end
+  EOF
+  $ vagrant up
+
+Vagrantのdocker provisionerを利用して環境構築（パッケージを利用）
+
+  $ mkdir ~/vagrant-docker-package && cd !$
+  $ cat <<EOF >Vagrantfile
+  Vagrant.configure(2) do |config|
+    config.vm.box = "ubuntu/trusty64"
     config.vm.network "private_network", ip: "192.168.33.10"
     config.vm.provision :docker do |d|
     end
   end
   EOF
   $ vagrant up
-
-Vagrantのdocker provisionerを利用して環境構築
-
-boot2dockerに比べ、ホストとのファイル共有などの設定が容易
 
 * Basic Usage
 
@@ -122,9 +141,9 @@ docker images
 
 docker run
 
-  $ docker run centos cat /etc/hostname
-  $ docker run -it centos /bin/bash
-  $ docker run --name clock -d centos /bin/sh -c 'while [ 1 ]; do date | tee -a date.log; wc -l date.log; sleep 1; done'
+  $ docker run --rm centos cat /etc/hostname
+  $ docker run --rm -it centos /bin/bash
+  $ docker run -d --name clock centos /bin/sh -c 'while [ 1 ]; do date | tee -a date.log; wc -l date.log; sleep 1; done'
 
 * Show (running|all) containers
 
@@ -168,7 +187,7 @@ docker start
 
 Dockerfileにイメージ構築手順を記述する
 
-  $ cat <<EOF > Dockerfile
+  $ cat <<EOF >Dockerfile
   FROM centos:centos6
   RUN yum install -y httpd
   COPY index.html /var/www/html/
@@ -298,36 +317,21 @@ stop.sh
 
 -v /container で他のコンテナとデータを共有するためのボリュームを指定する
 
-  $ docker run -d --name httpd -v /var/www -v /var/log/httpd ndsmeetup2/httpd
+  $ docker run -d --name httpd -v /usr/local/apache2/logs -v /usr/local/apache2/htdocs ndsmeetup2/httpd
   $ docker inspect -f '{{.Volumes}}' httpd
-  map[/var/log/httpd:/var/lib/docker/vfs/dir/... /var/www:/var/lib/docker/vfs/dir/...]
+  map[...]
 
 DockerfileではVOLUMEで指定する
 
-  VOLUME ["/var/www", "/var/log/httpd"]
-
-# 指定する「だけ」。が、指定せずにあとから設定は無理。
-
-* Mount Host (File|Directory) as a Data Volume
-
--v /host:/container[:rw|ro] でホストのファイルやディレクトリを新しいコンテナにマウントし、ボリュームとして指定する
-
-  $ cat /etc/hostname > index.html
-  $ docker run -d --name httpd_hostdir -v `pwd`:/var/www/html ndsmeetup2/httpd
-  $ docker inspect -f '{{.Volumes}}' httpd_hostdir
-  map[/var/www/html:/path_to_pwd]
-  $ curl `docker inspect -f '{{.NetworkSettings.IPAddress}}' httpd_hostdir`
-  YOUR_HOSTNAME
-
-ホストとコンテナ間でファイル共有をする場合に使用する
+  VOLUME ["/usr/local/apache2/logs", "/usr/local/apache2/htdocs"]
 
 * Data Volume Container
 
 --volumes-from を指定して、他のコンテナのボリュームを新しいコンテナにマウントする
 
   $ mkdir backup
-  $ docker run --volumes-from httpd -v `pwd`/backup:/backup ubuntu \
-    tar vczf /backup/backup.tar.gz /var/www /var/log/httpd
+  $ docker run --rm --volumes-from httpd -v `pwd`/backup:/backup ubuntu \
+    tar vczf /backup/backup.tar.gz /usr/local/apache2/logs /usr/local/apache2/htdocs
   $ ls -l backup
   backup.tar.gz
 
@@ -335,38 +339,49 @@ DockerfileではVOLUMEで指定する
 
 コンテナ間でファイル共有をする場合に使用する
 
+* Mount Host (File|Directory) as a Data Volume
+
+-v /host:/container[:rw|ro] でホストのファイルやディレクトリを新しいコンテナにマウントし、ボリュームとして指定する
+
+  $ cat /etc/hostname > index.html
+  $ docker run -d --name httpd -v `pwd`:/usr/local/apache2/htdocs httpd
+  $ docker inspect -f '{{.Volumes}}' httpd
+  map[...]
+  $ curl `docker inspect -f '{{.NetworkSettings.IPAddress}}' httpd`
+  YOUR_HOSTNAME
+
+ホストとコンテナ間でファイル共有をする場合に使用する
+
 * Networking
 
 * Using a new network stack
 
 デフォルトのブリッジネットワークモードの場合はポートフォワードを設定しなければならない
 
-  $ docker run -d -p 80:80 ndsmeetup2/httpd
+  $ docker run -d --name httpd -p 80:80 httpd
   $ curl localhost
-  <!DOCTYPE html>
-  <title>#ndsmeetup2</title>
-  Hello Docker
+  <html><body><h1>It works!</h1></body></html>
 
 * Using host network stack
 
 --net=host でホストのネットワークスタックを使用可能
 
-  $ docker run -d --net=host ndsmeetup2/httpd
+  $ docker run -d --name httpd --net host httpd
   $ curl localhost
-  <!DOCTYPE html>
-  <title>#ndsmeetup2</title>
-  Hello Docker
+  <html><body><h1>It works!</h1></body></html>
+
+コンテナ同士のポート番号の衝突に注意
 
 * Using another container network stack
 
 --net=container:<name|id> で他のコンテナのネットワークスタックを使用可能
 
-  $ docker run -d --name net_base ndsmeetup2/httpd
-  $ docker run -it --net=container:net_base centos /bin/bash
+  $ docker run -d --name httpd httpd
+  $ docker run --rm -it --net=container:httpd centos /bin/bash
   docker> curl localhost
-  <!DOCTYPE html>
-  <title>#ndsmeetup2</title>
-  Hello Docker
+  <html><body><h1>It works!</h1></body></html>
+
+ここでもポート番号の衝突に注意
 
 * Connecting directly into a docker container from the host OS of VM
 
@@ -382,3 +397,20 @@ boot2dockerやVagrantなどの仮想環境では、ホスト(Mac/Windows)OSの�
 
 boot2dockerやVagrantのdocker provisionerで構築（パッケージからインストール）した場合、仮想マシンのNATは設定済み。うまくいかない場合は仮想マシンのiptablesを確認する
 
+* Using host timezone
+
+デフォルトではイメージのタイムゾーンはUTC
+
+  $ docker run --rm centos date
+
+ホストのタイムゾーンを合わせる場合は /etc/localtime をバインドする
+
+  $ docker run --rm -v /etc/localtime:/etc/localtime:ro centos date
+
+もしくはDokcerfileで設定する
+
+* Demo
+
+- serf/          - Auto-Scaling
+- weave/         - Networking with containers on other hosts
+- multi-site/    - Hosting multiple sites

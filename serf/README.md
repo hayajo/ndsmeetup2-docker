@@ -1,34 +1,48 @@
-Serf + Docker
-=============
+# Serf + Docker
 
 Serfを使ってDockerコンテナをロードバランサ配下に自動で追加
 
 
-Prepare
--------
+## Archtecture
 
-* Build images
-
-        $ cd lb_serf && docker build -t ndsmeetup2/lb_serf .; cd -
-        $ cd app_serf && docker build -t ndsmeetup2/app_serf .; cd -
-
-
-Usage
------
-
-* Run a load balancer
-
-        $ docker run -itd -p 80:80 -p 9999:9999 --name lb_serf ndsmeetup2/lb_serf
-
-* Run some application servers
-
-        $ for i in $(seq 1 3); do
-        docker run -itd --link lb_serf:lb ndsmeetup2/app_serf
-        done
+                                                 +------------+
+                                          +----> | httpd,serf |
+                                          |      | [app_serf] |
+                                          |      +------------+
+                                          |
+                                          |
+    +----------+        +--------------+  |      +------------+
+    | Internet +------> | haproxy,serf +-------> | httpd,serf |
+    +----------+        | [lb_serf]    |  |      | [app_serf] |
+                        +--------------+  |      +------------+
+                                          |
+                                          |
+                                          |      +------------+
+                                          +----> | httpd,serf |
+                                                 | [app_serf] |
+                                                 +------------+
 
 
-Check
------
+## Usage
+
+Build images
+
+    $ (cd lb_serf && docker build -t ndsmeetup2/lb_serf .)
+    $ (cd app_serf && docker build -t ndsmeetup2/app_serf .)
+
+
+Run a load balancer
+
+    $ docker run -it -d -p 80:80 -p 9999:9999 --name lb_serf ndsmeetup2/lb_serf
+
+Run some application servers
+
+    $ for i in $(seq 1 3); do
+    for$ docker run -it -d --link lb_serf:lb ndsmeetup2/app_serf
+    for$ done
+
+
+## Check
 
 * on VM host OS
 
@@ -37,6 +51,6 @@ Check
 
 * on docker host
 
-    - http://localhost:39999/
+    - http://localhost/
     - http://localhost:9999/
 

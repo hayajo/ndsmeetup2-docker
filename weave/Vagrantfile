@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+DB_ADDR  = "192.168.33.20"
+WEB_ADDR = "192.168.33.10"
+WEAVE_DB_ADDR  = "10.0.1.2"
+WEAVE_WEB_ADDR = "10.0.1.1"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "ubuntu/trusty64"
+
+  config.vm.provision :shell, inline: <<-"EOF"
+    curl -sSL https://get.docker.com/ubuntu/ | sudo sh
+    gpasswd -a vagrant docker
+    curl -o /usr/local/bin/weave https://raw.githubusercontent.com/zettio/weave/master/weave
+    chmod a+x /usr/local/bin/weave
+  EOF
+
+  config.vm.define "db" do |db|
+    db.vm.provider :virtualbox do |v|
+      v.customize ["modifyvm", :id, "--memory", 1024]
+    end
+    db.vm.network "private_network", ip: DB_ADDR, virtualbox__intnet: "intnet"
+    db.vm.provision :shell, inline: <<-"EOF"
+      weave launch
+      weave run #{WEAVE_DB_ADDR}/24 -d --name mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=wordpress mysql
+    EOF
+  end
+
+  config.vm.define "web" do |web|
+    web.vm.network "private_network", ip: WEB_ADDR, virtualbox__intnet: "intnet"
+    web.vm.network :forwarded_port, host: 8080, guest: 80
+    web.vm.provision :shell, inline: <<-"EOF"
+      weave launch #{DB_ADDR}
+      weave run #{WEAVE_WEB_ADDR}/24 -d --name wordpress -e MYSQL_PORT_3306_TCP=tcp://#{WEAVE_DB_ADDR} -e WORDPRESS_DB_PASSWORD=root -p 80:80 wordpress
+    EOF
+  end
+
+end
