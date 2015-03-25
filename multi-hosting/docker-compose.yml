@@ -12,5 +12,5 @@ dproxy:
     - 8080:80
   links:
     - upstreams:redis
-
-
+webapp:
+  build: webapp/
