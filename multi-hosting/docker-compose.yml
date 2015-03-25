@@ -3,14 +3,14 @@ upstreams:
 linked:
   build: linked/
   environment:
-    - DOCKER_URL=http://172.17.42.1:2375
+    - DOCKER_URL=tcp://172.17.42.1:2375
   links:
     - upstreams:redis
 dproxy:
   build: dproxy/
   ports:
-    - 80:80
+    - 8080:80
   links:
     - upstreams:redis
-
-
+webapp:
+  build: webapp/

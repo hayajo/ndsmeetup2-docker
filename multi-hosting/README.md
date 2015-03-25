@@ -32,6 +32,16 @@ Dockerを使ったマルチサイトホスティングの例
 
 ## Usage
 
+check running docker daemon with `-H tcp://<DOCKER_HOST>:2375`.
+
+if running docker without the option, edit `DOCKER_OPTS` in `/etc/default/docker`.
+
+    DOCKER_OPTS="-H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock"
+
+and restart docker daemon.
+
+    $ sudo service docker restart
+
 Prepare upstream
 
     $ docker run -d --name=upstreams redis
@@ -43,7 +53,7 @@ Run linked
     -d \
     --name=linked \
     --link upstreams:redis \
-    -e DOCKER_URL=http://$(ip a show docker0 | ag -w inet | sed -e 's/\s\+/ /g' | cut -d ' ' -f3 | sed -e 's|/[0-9]\+$||'):2375 \
+    -e DOCKER_URL=tcp://$(ip a show docker0 | ag -w inet | sed -e 's/\s\+/ /g' | cut -d ' ' -f3 | sed -e 's|/[0-9]\+$||'):2375 \
     ndsmeetup2/linked
 
 Run dproxy
@@ -53,7 +63,7 @@ Run dproxy
     -d \
     --name dproxy \
     --link upstreams:redis \
-    -p 80:80 \
+    -p 8080:80 \
     ndsmeetup2/dproxy
 
 Hosts containers
