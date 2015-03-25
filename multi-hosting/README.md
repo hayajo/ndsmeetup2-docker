@@ -63,24 +63,19 @@ Run dproxy
     -d \
     --name dproxy \
     --link upstreams:redis \
-    -p 8080:80 \
+    -p 80:80 \
     ndsmeetup2/dproxy
 
 Hosts containers
 
-    $ for h in hoge.com fuga.com piyo.com; do
+    $ for h in hoge fuga piyo; do
     for$ docker run -d --name ${h}_mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=wordpress mysql
     for$ sleep 5
     for$ docker run -d --name $h --link ${h}_mysql:mysql -e WORDPRESS_DB_PASSWORD=root -P wordpress
     for$ done
 
-Edit /etc/hosts
-
-    $ sudo sh -c 'echo "127.0.0.1 hoge.com fuga.com piyo.com" >> /etc/hosts'
-
 Access with web browser
 
-    $ open http://hoge.com
-    $ open http://fuga.com
-    $ open http://piyo.com
-
+    $ open http://hoge.127.0.0.1.xip.io
+    $ open http://fuga.127.0.0.1.xip.io
+    $ open http://piyo.127.0.0.1.xip.io

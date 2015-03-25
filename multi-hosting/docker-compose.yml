@@ -9,7 +9,7 @@ linked:
 dproxy:
   build: dproxy/
   ports:
-    - 8080:80
+    - 80:80
   links:
     - upstreams:redis
 webapp:
